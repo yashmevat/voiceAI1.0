@@ -415,6 +415,9 @@
 </div>
 
 <script>
+const BASE_URL = window.location.hostname === "localhost"
+  ? "http://localhost:3000"
+  : "https://voiceai1-0.onrender.com";
 const TECHNOLOGY_CAPTURE_MS = 5000;
 const state = {
   interviewId: "",
@@ -736,7 +739,7 @@ async function startInterview() {
     const technologyFormData = new FormData();
     technologyFormData.append("audio", techAudio, "technology.webm");
 
-    const technologyResponse = await fetch("/api/interview/technology", {
+    const technologyResponse = await fetch(`${BASE_URL}/api/interview/technology`, {
       method: "POST",
       body: technologyFormData
     });
@@ -750,7 +753,7 @@ async function startInterview() {
     state.technology = technologyData.technology;
     technologyNotice.textContent = `Detected topic: ${state.technology}`;
 
-    const response = await fetch("/api/interview/start", {
+    const response = await fetch(`${BASE_URL}/api/interview/start`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ technology: state.technology })
@@ -800,7 +803,7 @@ async function submitNextAnswer() {
     formData.append("questionNumber", String(state.questionNumber));
     formData.append("audio", answerBlob, "answer.webm");
 
-    const response = await fetch("/api/interview/next", {
+    const response = await fetch(`${BASE_URL}/api/interview/next`, {
       method: "POST",
       body: formData
     });
@@ -841,7 +844,7 @@ async function finishInterview() {
   stepNotice.textContent = "Generating final assessment...";
 
   try {
-    const response = await fetch("/api/interview/finish", {
+    const response = await fetch(`${BASE_URL}/api/interview/finish`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
