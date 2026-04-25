@@ -77,36 +77,36 @@ async function transcribeAudioFile(filePath, originalName, mimeType) {
   return transcription.text || "";
 }
 
-async function generateQuestion(technology, history, questionNumber) {
+async function generateQuestion(topic, history, questionNumber) {
   return createJsonChatCompletion(
     [
       {
         role: "system",
-        content: `You are a strict but helpful VOICE interviewer for the field/domain: ${technology}. Ask exactly one question at a time. The question must be easy to answer verbally. Do not ask for typed code, punctuation-heavy syntax, or long written snippets. Prefer conceptual, scenario-based, and step-by-step explanation questions. Keep wording short, clear, and conversational. Return JSON with keys: question, topic, difficulty.`
+        content: `You are a strict but helpful VOICE interviewer for the field/domain: ${topic}. Ask exactly one question at a time. The question must be easy to answer verbally. Do not ask for typed code, punctuation-heavy syntax, or long written snippets. Prefer conceptual, scenario-based, and step-by-step explanation questions. Keep wording short, clear, and conversational. Return JSON with keys: question, topic, difficulty.`
       },
       {
         role: "user",
         content: JSON.stringify({
-          technology,
+          topic,
           questionNumber,
           history
         })
       }
     ],
     {
-      question: `Question ${questionNumber} for ${technology}`,
-      topic: technology,
+      question: `Question ${questionNumber} for ${topic}`,
+      topic: topic,
       difficulty: 5
     }
   );
 }
 
-async function makeVoiceFriendlyQuestion(technology, question) {
+async function makeVoiceFriendlyQuestion(topic, question) {
   const rewritten = await createJsonChatCompletion(
     [
       {
         role: "system",
-        content: `Rewrite interview questions for voice conversation in the field/domain ${technology}. Keep the same intent but make it naturally speakable. Rules: short sentence, no code blocks, no request for exact syntax, no special symbols-heavy prompt. If the original asks to write code, convert it to explain approach verbally. Return JSON with key: question.`
+        content: `Rewrite interview questions for voice conversation in the field/domain ${topic}. Keep the same intent but make it naturally speakable. Rules: short sentence, no code blocks, no request for exact syntax, no special symbols-heavy prompt. If the original asks to write code, convert it to explain approach verbally. Return JSON with key: question.`
       },
       {
         role: "user",
@@ -123,24 +123,24 @@ async function makeVoiceFriendlyQuestion(technology, question) {
     return speakable;
   }
 
-  return `Please explain one practical concept related to ${technology}.`;
+  return `Please explain one practical concept related to ${topic}.`;
 }
 
-function fallbackQuestionText(technology) {
-  return `Please explain one practical concept related to ${technology}.`;
+function fallbackQuestionText(topic) {
+  return `Please explain one practical concept related to ${topic}.`;
 }
 
-async function finalAssessment(technology, history) {
+async function finalAssessment(topic, history) {
   return createJsonChatCompletion(
     [
       {
         role: "system",
-        content: `You are giving a final hiring-style assessment for an interview in the field/domain ${technology}. Decide whether the candidate is ready to work in this field/domain based on the conversation so far. Return JSON with keys: canProceed, verdict, overallScore, summary, strengths, gaps, recommendation.`
+        content: `You are giving a final hiring-style assessment for an interview in the field/domain ${topic}. Decide whether the candidate is ready to work in this field/domain based on the conversation so far. Return JSON with keys: canProceed, verdict, overallScore, summary, strengths, gaps, recommendation.`
       },
       {
         role: "user",
         content: JSON.stringify({
-          technology,
+          topic,
           history
         })
       }
@@ -157,27 +157,27 @@ async function finalAssessment(technology, history) {
   );
 }
 
-app.post("/api/interview/technology", upload.single("audio"), async (req, res) => {
+app.post("/api/interview/topic", upload.single("audio"), async (req, res) => {
   const audioPath = req.file?.path;
-  const originalName = req.file?.originalname || "technology.webm";
+  const originalName = req.file?.originalname || "topic.webm";
   const mimeType = req.file?.mimetype || "audio/webm";
 
   if (!audioPath) {
-    return res.status(400).json({ error: "Technology audio is required" });
+    return res.status(400).json({ error: "Topic audio is required" });
   }
 
   try {
-    const technologyRaw = await transcribeAudioFile(audioPath, originalName, mimeType);
-    const technology = technologyRaw.trim().replace(/[.,!?]+$/g, "");
+    const topicRaw = await transcribeAudioFile(audioPath, originalName, mimeType);
+    const topic = topicRaw.trim().replace(/[.,!?]+$/g, "");
 
-    if (!technology) {
-      return res.status(400).json({ error: "Could not detect technology name" });
+    if (!topic) {
+      return res.status(400).json({ error: "Could not detect topic name" });
     }
 
-    res.json({ technology });
+    res.json({ topic });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Unable to process technology audio" });
+    res.status(500).json({ error: "Unable to process topic audio" });
   } finally {
     if (audioPath && fs.existsSync(audioPath)) {
       fs.unlinkSync(audioPath);
@@ -187,22 +187,22 @@ app.post("/api/interview/technology", upload.single("audio"), async (req, res) =
 
 app.post("/api/interview/start", async (req, res) => {
   try {
-    const technology = (req.body?.technology || "").trim();
+    const topic = (req.body?.topic || "").trim();
 
-    if (!technology) {
-      return res.status(400).json({ error: "Technology is required" });
+    if (!topic) {
+      return res.status(400).json({ error: "Topic is required" });
     }
 
-    const firstQuestion = await generateQuestion(technology, [], 1);
+    const firstQuestion = await generateQuestion(topic, [], 1);
     const voiceQuestion = await makeVoiceFriendlyQuestion(
-      technology,
-      firstQuestion.question || fallbackQuestionText(technology)
+      topic,
+      firstQuestion.question || fallbackQuestionText(topic)
     );
     const questionAudio = await safeSpeakText(voiceQuestion);
     const interviewId = crypto.randomUUID();
 
     interviewSessions.set(interviewId, {
-      technology,
+      topic,
       history: [],
       createdAt: Date.now()
     });
@@ -213,8 +213,7 @@ app.post("/api/interview/start", async (req, res) => {
       question: voiceQuestion,
       questionAudio,
       topic: firstQuestion.topic,
-      difficulty: firstQuestion.difficulty,
-      technology
+      difficulty: firstQuestion.difficulty
     });
   } catch (error) {
     console.error(error);
@@ -259,13 +258,13 @@ app.post("/api/interview/next", upload.single("audio"), async (req, res) => {
     let nextQuestion;
     try {
       const generated = await generateQuestion(
-        session.technology,
+        session.topic,
         session.history,
         nextQuestionNumber
       );
       const voiceNextQuestion = await makeVoiceFriendlyQuestion(
-        session.technology,
-        generated.question || fallbackQuestionText(session.technology)
+        session.topic,
+        generated.question || fallbackQuestionText(session.topic)
       );
       nextQuestion = {
         text: voiceNextQuestion,
@@ -275,8 +274,8 @@ app.post("/api/interview/next", upload.single("audio"), async (req, res) => {
     } catch (error) {
       console.error("Question generation failed:", error?.message || error);
       nextQuestion = {
-        text: `Please explain one practical experience related to ${session.technology}.`,
-        topic: session.technology,
+        text: `Please explain one practical experience related to ${session.topic}.`,
+        topic: session.topic,
         difficulty: 5
       };
     }
@@ -317,7 +316,7 @@ app.post("/api/interview/finish", async (req, res) => {
       return res.status(400).json({ error: "Answer at least one question before finishing" });
     }
 
-    const assessment = await finalAssessment(session.technology, session.history);
+    const assessment = await finalAssessment(session.topic, session.history);
     const assessmentAudio = await safeSpeakText(
       `${assessment.verdict}. ${assessment.summary} Recommendation: ${assessment.recommendation}.`
     );
@@ -325,7 +324,7 @@ app.post("/api/interview/finish", async (req, res) => {
     interviewSessions.delete(interviewId);
 
     res.json({
-      technology: session.technology,
+      topic: session.topic,
       history: session.history,
       assessment,
       assessmentAudio

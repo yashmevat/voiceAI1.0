@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AI Interview Taker</title>
+    <title>AI HR Interview Platform</title>
   <style>
     :root {
       --bg: #07111f;
@@ -343,8 +343,8 @@
 <div class="shell">
   <div class="hero">
     <div>
-      <div class="eyebrow">AI Interview Taker</div>
-      <h1>Practice any topic with an adaptive voice interview.</h1>
+      <div class="eyebrow">AI HR Interview Platform</div>
+      <h1>AI HR Interview Platform</h1>
       <p class="lead">AI asks your topic by voice, then keeps asking follow-up interview questions until you decide to finish and get the combined result.</p>
     </div>
     <div class="results">
@@ -358,7 +358,7 @@
     <div class="setup-grid">
       <div>
         <label>Topic Selection</label>
-        <div class="notice" id="technologyNotice">Click start, listen to the prompt, then speak your topic clearly.</div>
+        <div class="notice" id="topicNotice">Click start, listen to the prompt, then speak your topic clearly.</div>
       </div>
       <button class="btn btn-primary" id="startButton" onclick="startInterview()">Speak Topic & Start</button>
     </div>
@@ -368,7 +368,7 @@
     <div class="workspace hidden" id="workspacePanel">
       <div class="status-row">
         <div class="pill" id="techPill">Topic: <strong>-</strong></div>
-        <div class="pill" id="progressPill">Question <strong>0</strong> / 10</div>
+        <div class="pill" id="progressPill">Question <strong>0</strong></div>
         <div class="pill" id="statusPill">Status: <strong>Waiting</strong></div>
         <div class="pill" id="micPill">Mic: <strong>Off</strong></div>
       </div>
@@ -418,10 +418,10 @@
 const BASE_URL = window.location.hostname === "localhost"
   ? "http://localhost:3000"
   : "https://voiceai1-0.onrender.com";
-const TECHNOLOGY_CAPTURE_MS = 5000;
+const TOPIC_CAPTURE_MS = 5000;
 const state = {
   interviewId: "",
-  technology: "",
+  topic: "",
   questionNumber: 0,
   currentQuestion: "",
   history: [],
@@ -433,7 +433,7 @@ const state = {
   audioChunks: []
 };
 
-const technologyNotice = document.getElementById("technologyNotice");
+const topicNotice = document.getElementById("topicNotice");
 const startButton = document.getElementById("startButton");
 const workspacePanel = document.getElementById("workspacePanel");
 const finalPanel = document.getElementById("finalPanel");
@@ -460,7 +460,7 @@ function setRecordingState(isRecording) {
   state.recording = isRecording;
   const recordingLabel = !isRecording
     ? "Off"
-    : state.captureMode === "technology"
+    : state.captureMode === "topic"
       ? "Recording tech"
       : "Recording answer";
 
@@ -516,7 +516,7 @@ function updateQuestionView(question, questionNumber) {
   questionText.textContent = question;
   questionMeta.textContent = `Question ${questionNumber}. Listen first, then answer out loud when the microphone opens.`;
   progressPill.innerHTML = `Questions answered: <strong>${state.history.length}</strong>`;
-  techPill.innerHTML = `Topic: <strong>${state.technology}</strong>`;
+  techPill.innerHTML = `Topic: <strong>${state.topic}</strong>`;
   setStatus("In progress");
 }
 
@@ -630,13 +630,13 @@ async function startRecording() {
   stepNotice.textContent = "Speak your answer, then click Next to send it.";
 }
 
-async function captureTechnologyAudio() {
+async function captureTopicAudio() {
   await ensureMicrophone();
 
   return new Promise((resolve, reject) => {
     const chunks = [];
     const recorder = new MediaRecorder(state.mediaStream);
-    state.captureMode = "technology";
+    state.captureMode = "topic";
 
     recorder.ondataavailable = (event) => {
       if (event.data.size > 0) {
@@ -645,7 +645,7 @@ async function captureTechnologyAudio() {
     };
 
     recorder.onerror = () => {
-      reject(new Error("Could not record technology audio"));
+      reject(new Error("Could not record topic audio"));
     };
 
     recorder.onstop = () => {
@@ -655,14 +655,14 @@ async function captureTechnologyAudio() {
 
     recorder.start();
     setRecordingState(true);
-    setStatus("Listening for technology", "var(--good)");
-    stepNotice.textContent = "Speak your technology now...";
+    setStatus("Listening for topic", "var(--good)");
+    stepNotice.textContent = "Speak your topic now...";
 
     window.setTimeout(() => {
       if (recorder.state === "recording") {
         recorder.stop();
       }
-    }, TECHNOLOGY_CAPTURE_MS);
+    }, TOPIC_CAPTURE_MS);
   });
 }
 
@@ -713,14 +713,14 @@ async function startInterview() {
   setBusy(true);
   finalPanel.classList.add("hidden");
   workspacePanel.classList.remove("hidden");
-  state.technology = "";
+  state.topic = "";
   state.interviewId = "";
   state.questionNumber = 0;
   state.currentQuestion = "";
   state.history = [];
   state.captureMode = null;
   setRecordingState(false);
-  technologyNotice.textContent = "Listening...";
+  topicNotice.textContent = "Listening...";
   stepNotice.textContent = "Preparing your voice interview...";
   renderHistory();
 
@@ -730,33 +730,33 @@ async function startInterview() {
     const topicPrompt = "Which topic do you want me to ask questions about? Say it clearly after this message.";
     await playAudio(null, topicPrompt);
 
-    const techAudio = await captureTechnologyAudio();
+    const topicAudio = await captureTopicAudio();
     setRecordingState(false);
     state.captureMode = null;
-    setStatus("Detecting technology", "var(--accent)");
+    setStatus("Detecting topic", "var(--accent)");
     stepNotice.textContent = "Identifying topic from your voice...";
 
-    const technologyFormData = new FormData();
-    technologyFormData.append("audio", techAudio, "technology.webm");
+    const topicFormData = new FormData();
+    topicFormData.append("audio", topicAudio, "topic.webm");
 
-    const technologyResponse = await fetch(`${BASE_URL}/api/interview/technology`, {
+    const topicResponse = await fetch(`${BASE_URL}/api/interview/topic`, {
       method: "POST",
-      body: technologyFormData
+      body: topicFormData
     });
 
-    const technologyData = await technologyResponse.json();
+    const topicData = await topicResponse.json();
 
-    if (!technologyResponse.ok) {
-      throw new Error(technologyData.error || "Unable to detect topic");
+    if (!topicResponse.ok) {
+      throw new Error(topicData.error || "Unable to detect topic");
     }
 
-    state.technology = technologyData.technology;
-    technologyNotice.textContent = `Detected topic: ${state.technology}`;
+    state.topic = topicData.topic;
+    topicNotice.textContent = `Detected topic: ${state.topic}`;
 
     const response = await fetch(`${BASE_URL}/api/interview/start`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ technology: state.technology })
+      body: JSON.stringify({ topic: state.topic })
     });
 
     const data = await response.json();
@@ -789,8 +789,10 @@ async function submitNextAnswer() {
   try {
     const answerBlob = await stopRecording();
 
-    if (!answerBlob) {
-      throw new Error("No recorded answer found. Please answer and try again.");
+    if (!answerBlob || answerBlob.size === 0) {
+      alert("Please say your answer before clicking Next.");
+      setBusy(false);
+      return;
     }
 
     setRecordingState(false);
@@ -861,7 +863,9 @@ async function finishInterview() {
     const assessment = data.assessment;
     finalPanel.classList.remove("hidden");
     document.getElementById("finalVerdict").textContent = assessment.verdict;
-    document.getElementById("finalScore").textContent = `${assessment.overallScore}/10`;
+    // Cap the score at 10 for display
+    const cappedScore = Math.min(Number(assessment.overallScore), 10);
+    document.getElementById("finalScore").textContent = `${cappedScore}/10`;
     document.getElementById("finalRecommendation").textContent = assessment.recommendation;
     document.getElementById("finalSummary").textContent = assessment.summary;
 
